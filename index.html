@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Steam Farmer Visual</title>
+    <style>
+        body { font-family: sans-serif; background: #1b2838; color: #c7d5e0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .card { background: #171a21; padding: 20px; border-radius: 5px; margin-bottom: 20px; }
+        input, button, select { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
+        button { background: #66c0f4; color: white; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { background: #419dc9; }
+        .game-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 10px; }
+        .game-item { background: #2a475e; padding: 10px; text-align: center; cursor: pointer; border: 2px solid transparent; }
+        .game-item:hover { border-color: #66c0f4; }
+        .game-item.selected { border-color: #a4d007; background: #3c502a; }
+        .game-item img { max-width: 100%; }
+        h2 { border-bottom: 1px solid #2a475e; padding-bottom: 10px; }
+        #qrcode { background: white; padding: 10px; display: inline-block; margin-top: 10px; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Steam Farmer 🚜</h1>
+
+        <!-- Busca de Jogos -->
+        <div class="card">
+            <h2>1. Selecionar Jogos</h2>
+            <input type="text" id="searchInput" placeholder="Digite o nome do jogo (ex: Counter Strike)...">
+            <button onclick="searchGames()">Pesquisar</button>
+            <div id="results" class="game-grid"></div>
+            <p>IDs Selecionados: <span id="selectedIds">Nenhum</span></p>
+        </div>
+
+        <!-- Configuração -->
+        <div class="card">
+            <h2>2. Configuração</h2>
+            <label>Duração (minutos):</label>
+            <input type="number" id="duration" value="60">
+            
+            <label>Modo de Operação:</label>
+            <select id="mode" onchange="toggleCredentials()">
+                <option value="client">Modo Cliente (Steam Aberta)</option>
+                <option value="credentials">Modo Login (Servidor/Headless)</option>
+                <option value="qr">Modo QR Code (App Mobile)</option>
+            </select>
+
+            <div id="credFields" style="display:none; margin-top:10px; border-top: 1px solid #333; padding-top:10px;">
+                <input type="text" id="username" placeholder="Usuário Steam">
+                <input type="password" id="password" placeholder="Senha Steam">
+                <small style="color: orange;">⚠ Se pedir Steam Guard, olhe o terminal onde iniciou o script.</small>
+            </div>
+
+            <div id="qrField" style="display:none; margin-top:10px; text-align: center;">
+                <p>Abra o app da Steam no celular e escaneie:</p>
+                <div id="qrcode"></div>
+                <p id="qrStatus" style="color: #66c0f4; font-size: 12px;">Aguardando geração...</p>
+            </div>
+        </div>
+
+        <!-- Ações -->
+        <div class="card">
+            <button onclick="startFarm()" style="background: #a4d007; color: #1b2838;">INICIAR FARM</button>
+            <button onclick="stopFarm()" style="background: #c94141; margin-top: 10px;">PARAR TUDO</button>
+        </div>
+    </div>
+
+    <script>
+        let selectedGames = new Set();
+        let qrInterval = null;
+        let qrCodeObj = null;
+
+        async function searchGames() {
+            const query = document.getElementById('searchInput').value;
+            const res = await fetch(`/api/search?q=${query}`);
+            const games = await res.json();
+            
+            const grid = document.getElementById('results');
+            grid.innerHTML = '';
+            
+            games.forEach(game => {
+                const div = document.createElement('div');
+                div.className = 'game-item';
+                div.onclick = () => toggleGame(game.id, div);
+                div.innerHTML = `
+                    <img src="${game.imageUrl}" alt="${game.name}">
+                    <div style="font-size: 12px; margin-top: 5px;">${game.name}</div>
+                    <div style="font-size: 10px; color: #888;">ID: ${game.id}</div>
+                `;
+                grid.appendChild(div);
+            });
+        }
+
+        function toggleGame(id, element) {
+            if (selectedGames.has(id)) {
+                selectedGames.delete(id);
+                element.classList.remove('selected');
+            } else {
+                selectedGames.add(id);
+                element.classList.add('selected');
+            }
+            document.getElementById('selectedIds').innerText = Array.from(selectedGames).join(', ');
+        }
+
+        function toggleCredentials() {
+            const mode = document.getElementById('mode').value;
+            document.getElementById('credFields').style.display = mode === 'credentials' ? 'block' : 'none';
+            document.getElementById('qrField').style.display = mode === 'qr' ? 'block' : 'none';
+        }
+
+        async function startFarm() {
+            const mode = document.getElementById('mode').value;
+            const duration = parseInt(document.getElementById('duration').value);
+            const appIds = Array.from(selectedGames);
+
+            if (appIds.length === 0) return alert('Selecione pelo menos um jogo!');
+
+            let endpoint = '/api/start-client';
+            let body = { appIds, duration };
+
+            if (mode === 'credentials') {
+                endpoint = '/api/start-credentials';
+                body.username = document.getElementById('username').value;
+                body.password = document.getElementById('password').value;
+                if (!body.username || !body.password) return alert('Preencha usuário e senha!');
+            } else if (mode === 'qr') {
+                endpoint = '/api/start-qr';
+                startQrPolling();
+            }
+
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+            alert(data.message);
+        }
+
+        function startQrPolling() {
+            if (qrInterval) clearInterval(qrInterval);
+            const qrContainer = document.getElementById('qrcode');
+            qrContainer.innerHTML = ''; // Limpa anterior
+            qrCodeObj = null;
+
+            qrInterval = setInterval(async () => {
+                const res = await fetch('/api/qr-code');
+                const data = await res.json();
+                
+                if (data.url) {
+                    document.getElementById('qrStatus').innerText = "Escaneie agora!";
+                    if (!qrCodeObj) {
+                        // Cria o QR Code apenas uma vez
+                        qrCodeObj = new QRCode(qrContainer, {
+                            text: data.url,
+                            width: 180,
+                            height: 180
+                        });
+                    }
+                } else if (qrCodeObj) {
+                    document.getElementById('qrStatus').innerText = "Login efetuado ou expirado.";
+                    clearInterval(qrInterval);
+                }
+            }, 1000);
+        }
+
+        async function stopFarm() {
+            await fetch('/api/stop', { method: 'POST' });
+            if (qrInterval) clearInterval(qrInterval);
+            alert('Comando de parada enviado.');
+        }
+    </script>
+</body>
+</html>

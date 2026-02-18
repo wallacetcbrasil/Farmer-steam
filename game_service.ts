@@ -21,6 +21,9 @@ export class GameService {
         try {
             console.log(`[GameService] Buscando detalhes na API Steam para AppID: ${appId}...`);
             const response = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appId}`);
+            if (!response.ok) {
+                throw new Error(`Falha na requisição: ${response.status} ${response.statusText}`);
+            }
             const data: any = await response.json();
             console.log(`[GameService] Resposta recebida para ${appId}. Status: ${response.status}`);
 
@@ -54,6 +57,9 @@ export class GameService {
         try {
             console.log(`[GameService] Consultando API de busca para: "${query}"`);
             const response = await fetch(`https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(query)}&l=english&cc=US`);
+            if (!response.ok) {
+                throw new Error(`Falha na busca: ${response.status}`);
+            }
             const data: any = await response.json();
             console.log(`[GameService] Busca retornou ${data.items ? data.items.length : 0} resultados.`);
 

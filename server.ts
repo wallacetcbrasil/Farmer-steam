@@ -9,7 +9,7 @@ const port = 3000;
 
 // Serviços
 const gameService = new GameService();
-const idler = new SteamIdler();
+const idler = new SteamIdler(gameService);
 
 app.use(bodyParser.json());
 const publicPath = path.join(__dirname, 'public');
@@ -24,6 +24,27 @@ app.get('/', (req, res) => {
         <p>Verifique se você criou a pasta <b>public</b> na raiz do projeto e moveu o arquivo <b>index.html</b> para dentro dela.</p>
     `);
 });
+
+// --- Rota de Eventos (Server-Sent Events) para Logs no Navegador ---
+app.get('/api/events', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    // Função para enviar dados para este cliente específico
+    const sendLog = (data: any) => {
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    // Inscreve este cliente para receber logs do Idler
+    idler.on('log-event', sendLog);
+
+    // Quando o navegador fechar a aba, removemos a inscrição
+    req.on('close', () => {
+        idler.removeListener('log-event', sendLog);
+    });
+});
+// ------------------------------------------------------------------
 
 // Rota para buscar jogos
 app.get('/api/search', async (req, res) => {

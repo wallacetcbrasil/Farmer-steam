@@ -1,5 +1,6 @@
 import { ChildProcess, spawn } from 'child_process';
 import * as dotenv from 'dotenv';
+import { EventEmitter } from 'events';
 import * as path from 'path';
 import * as readline from 'readline';
 import { EAuthTokenPlatformType, LoginSession } from 'steam-session';
@@ -7,12 +8,14 @@ import SteamUser from 'steam-user';
 
 dotenv.config(); // Carrega as variáveis do arquivo .env
 
+import { GameService } from './game_service';
+
 interface ActiveProcess {
     process: ChildProcess;
     appId: number;
 }
 
-export class SteamIdler {
+export class SteamIdler extends EventEmitter {
     private client: SteamUser;
     private rl: readline.Interface;
     private activeProcesses: ActiveProcess[] = [];
@@ -20,8 +23,11 @@ export class SteamIdler {
     public qrUrl: string | null = null;
     private lastLoginOptions: any = null; // Salva credenciais para reconectar
     private currentAppIds: number[] = []; // Salva os jogos atuais para retomar farm
+    private idleTimer: NodeJS.Timeout | null = null; // Referência para o timer de parada
+    private gameNames: Map<number, string> = new Map(); // Cache local de nomes para logs
 
-    constructor() {
+    constructor(private gameService: GameService) {
+        super();
         this.client = new SteamUser();
         
         // Interface para entrada de dados no terminal (Steam Guard)
@@ -33,23 +39,37 @@ export class SteamIdler {
         this.initializeEvents();
     }
 
+    /**
+     * Centraliza os logs para enviar tanto para o terminal quanto para o navegador via evento.
+     */
+    private log(message: string, type: 'info' | 'error' | 'warning' = 'info'): void {
+        const timestamp = new Date().toLocaleTimeString();
+        const formattedMsg = `[${timestamp}] ${message}`;
+        
+        if (type === 'error') console.error(formattedMsg);
+        else console.log(formattedMsg);
+
+        // Emite o evento para o server.ts enviar ao frontend
+        this.emit('log-event', { message: formattedMsg, type });
+    }
+
     private initializeEvents(): void {
         // Evento disparado quando o login é bem-sucedido
         this.client.on('loggedOn', () => {
-            console.log(`[${new Date().toLocaleTimeString()}] Conectado à Steam com sucesso!`);
+            this.log('Conectado à Steam com sucesso!');
             // Usamos 'Invisible' para não atrapalhar sua sessão principal nem notificar amigos
             this.client.setPersona(SteamUser.EPersonaState.Invisible);
             
             // Se houver jogos configurados, inicia/retoma o farm automaticamente
             if (this.currentAppIds.length > 0) {
-                console.log(`Retomando farm nos AppIDs: ${this.currentAppIds.join(', ')}`);
+                this.log(`Retomando farm nos AppIDs: ${this.currentAppIds.join(', ')}`);
                 this.client.gamesPlayed(this.currentAppIds);
             }
         });
 
         // Evento para lidar com Steam Guard (Email ou Mobile)
         this.client.on('steamGuard', (domain, callback) => {
-            console.log('Steam Guard solicitado.');
+            this.log('Steam Guard solicitado.', 'warning');
             const query = domain 
                 ? `Código enviado para o email (${domain}): ` 
                 : 'Código do autenticador móvel (2FA): ';
@@ -59,8 +79,17 @@ export class SteamIdler {
             });
         });
 
+        // Evento recomendado pela documentação para manter credenciais atualizadas
+        this.client.on('refreshToken', (token) => {
+            this.log('Nota: Refresh Token atualizado pela Steam.');
+            if (this.mode === 'credentials') {
+                if (!this.lastLoginOptions) this.lastLoginOptions = {};
+                this.lastLoginOptions.refreshToken = token;
+            }
+        });
+
         this.client.on('error', (err) => {
-            console.error(`[Erro] Ocorreu um problema: ${err.message}`);
+            this.log(`Ocorreu um problema: ${err.message}`, 'error');
             // Se der erro de login por já estar conectado
             if (err.message === 'LoggedInElsewhere' || err.message === 'LogonSessionReplaced') {
                 this.handleConflict();
@@ -69,11 +98,11 @@ export class SteamIdler {
 
         // Evento disparado quando a conexão cai (ex: você abriu um jogo e a Steam chutou o bot)
         this.client.on('disconnected', (eresult, msg) => {
-            console.log(`[Desconectado] Razão: ${msg} (${eresult})`);
+            this.log(`[Desconectado] Razão: ${msg} (${eresult})`, 'warning');
             
             // EResult 6 = LoggedInElsewhere
             // EResult 34 = LogonSessionReplaced
-            if (eresult === 6 || eresult === 34) {
+            if (eresult === SteamUser.EResult.LoggedInElsewhere || eresult === SteamUser.EResult.LogonSessionReplaced) {
                 this.handleConflict();
             }
         });
@@ -83,13 +112,13 @@ export class SteamIdler {
      * Gerencia o conflito de sessão: Espera 5 minutos e tenta voltar.
      */
     private handleConflict(): void {
-        console.log('⚠ Detectado uso da Steam no PC (Você está jogando).');
-        console.log('💤 O farm entrará em modo de espera por 5 minutos para não te atrapalhar.');
+        this.log('⚠ Detectado uso da Steam no PC (Você está jogando).', 'warning');
+        this.log('💤 O farm entrará em modo de espera por 5 minutos para não te atrapalhar.');
         
         setTimeout(() => {
             if (this.mode === 'credentials' && this.lastLoginOptions) {
-                console.log('🔄 Tentando retomar o farm...');
-                console.log('👀 Verificando se a conta está livre para voltar a farmar...');
+                this.log('🔄 Tentando retomar o farm...');
+                this.log('👀 Verificando se a conta está livre para voltar a farmar...');
                 this.client.logOn(this.lastLoginOptions);
             }
         }, 5 * 60 * 1000);
@@ -103,13 +132,13 @@ export class SteamIdler {
         this.lastLoginOptions = { accountName: username, password: password };
         this.currentAppIds = appIds;
 
-        console.log(`Iniciando login para o usuário: ${username}`);
+        this.log(`Iniciando login para o usuário: ${username}`);
         
         this.client.logOn(this.lastLoginOptions);
 
-        console.log(`Timer definido para encerrar em ${durationMinutes} minutos.`);
+        this.log(`Timer definido para encerrar em ${durationMinutes} minutos.`);
         // O timer encerra tudo definitivamente após o tempo estipulado
-        setTimeout(() => { this.stopIdling(); }, durationMinutes * 60 * 1000);
+        this.idleTimer = setTimeout(() => { this.stopIdling(); }, durationMinutes * 60 * 1000);
     }
 
     /**
@@ -131,12 +160,12 @@ export class SteamIdler {
             });
 
             session.on('timeout', () => {
-                console.log('QR Code expirou.');
+                this.log('QR Code expirou.', 'warning');
                 this.qrUrl = null;
             });
 
             session.on('error', (err) => {
-                console.error('Erro na sessão QR Code:', err);
+                this.log(`Erro na sessão QR Code: ${err.message}`, 'error');
                 this.qrUrl = null;
             });
 
@@ -144,13 +173,13 @@ export class SteamIdler {
             
             // Salva a URL para o frontend exibir
             this.qrUrl = startResult.qrChallengeUrl;
-            console.log('QR Code gerado. Aguardando leitura...');
+            this.log('QR Code gerado. Aguardando leitura...');
 
-            console.log(`Timer definido para encerrar em ${durationMinutes} minutos.`);
-            setTimeout(() => { this.stopIdling(); }, durationMinutes * 60 * 1000);
+            this.log(`Timer definido para encerrar em ${durationMinutes} minutos.`);
+            this.idleTimer = setTimeout(() => { this.stopIdling(); }, durationMinutes * 60 * 1000);
 
         } catch (err) {
-            console.error('Erro no processo de QR Code:', err);
+            this.log(`Erro no processo de QR Code: ${err}`, 'error');
             this.qrUrl = null;
         }
     }
@@ -159,12 +188,22 @@ export class SteamIdler {
      * MODO 2: Inicia o idling simulando processos (Requer Steam oficial aberta).
      * Cria processos "fantasmas" que herdam a variável SteamAppId.
      */
-    public startIdlingWithClient(appIds: number[], durationMinutes: number): void {
+    public async startIdlingWithClient(appIds: number[], durationMinutes: number): Promise<void> {
+        // Para processos anteriores para evitar duplicatas e limpar timers antigos
+        this.stopIdling();
+
         this.mode = 'client';
-        console.log(`Iniciando modo Cliente (Steam deve estar aberta). AppIDs: ${appIds.join(', ')}`);
+        this.log(`Iniciando modo Cliente (Steam deve estar aberta). AppIDs: ${appIds.join(', ')}`);
         
         // Caminho absoluto para o nosso script worker
         const workerPath = path.join(__dirname, 'client_worker.js');
+
+        // Busca os nomes dos jogos antes de iniciar
+        this.log('Resolvendo nomes dos jogos...');
+        for (const id of appIds) {
+            const details = await this.gameService.getGameDetails(id);
+            this.gameNames.set(id, details ? details.name : `AppID ${id}`);
+        }
 
         appIds.forEach(appId => {
             try {
@@ -176,24 +215,35 @@ export class SteamIdler {
                 });
                 
                 // Redireciona logs do worker para o terminal principal para vermos erros
-                child.stdout?.on('data', d => console.log(`[Jogo ${appId}]: ${d.toString().trim()}`));
-                child.stderr?.on('data', d => console.error(`[Erro ${appId}]: ${d.toString().trim()}`));
+                const gameName = this.gameNames.get(appId) || appId;
+                
+                child.stdout?.on('data', d => this.log(`[${gameName}]: ${d.toString().trim()}`));
+                // Filtra erros comuns de minidump que poluem o log
+                child.stderr?.on('data', d => {
+                    const msg = d.toString().trim();
+                    if (!msg.includes('minidump') && !msg.includes('Caching Steam ID')) {
+                        this.log(`[Erro ${gameName}]: ${msg}`, 'error');
+                    }
+                });
 
                 this.activeProcesses.push({ process: child, appId });
-                console.log(`Processo iniciado para AppID: ${appId} (PID: ${child.pid})`);
+                this.log(`Processo iniciado para: ${gameName} (PID: ${child.pid})`);
             } catch (e) {
-                console.error(`Erro ao iniciar AppID ${appId}:`, e);
+                this.log(`Erro ao iniciar AppID ${appId}: ${e}`, 'error');
             }
         });
 
-        console.log(`Timer definido para encerrar em ${durationMinutes} minutos.`);
-        setTimeout(() => {
-            this.stopIdling();
-        }, durationMinutes * 60 * 1000);
+        this.log(`Timer definido para encerrar em ${durationMinutes} minutos.`);
+        this.idleTimer = setTimeout(() => { this.stopIdling(); }, durationMinutes * 60 * 1000);
     }
 
     public stopIdling(): void {
-        console.log('Tempo esgotado ou parada solicitada. Encerrando...');
+        this.log('Tempo esgotado ou parada solicitada. Encerrando...');
+        
+        if (this.idleTimer) {
+            clearTimeout(this.idleTimer);
+            this.idleTimer = null;
+        }
         
         if (this.mode === 'credentials') {
             try { this.client.gamesPlayed([]); } catch (e) { /* Ignora se já caiu */ }
@@ -204,7 +254,7 @@ export class SteamIdler {
                     // Mata o processo
                     item.process.kill();
                 } catch (e) {
-                    console.error(`Erro ao finalizar processo ${item.process.pid}:`, e);
+                    this.log(`Erro ao finalizar processo ${item.process.pid}: ${e}`, 'error');
                 }
             });
             this.activeProcesses = [];

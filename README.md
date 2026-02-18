@@ -39,6 +39,14 @@ Uma ferramenta visual e robusta para farmar horas de jogo e cartas na Steam. Des
    npm start
    ```
 
+   > **Dica (Debug):** Se quiser ver os logs do servidor nativamente no Console do Chrome (DevTools), rode com a flag de inspeção:
+   >
+   > ```bash
+   > node --inspect -r ts-node/register server.ts
+   > ```
+   >
+   > Depois acesse `chrome://inspect` no navegador e clique em "inspect".
+
 2. Abra o navegador em:
    `http://localhost:3000`
 

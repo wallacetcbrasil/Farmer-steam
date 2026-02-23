@@ -13,41 +13,86 @@ export class GameService {
      * @param appId O ID do jogo (ex: 730 para CS2)
      */
     public async getGameDetails(appId: number): Promise<GameInfo | null> {
-        // 1. Verifica se já temos no cache
+        // 1. Verifica o cache primeiro para uma resposta rápida
         if (this.cache.has(appId)) {
             return this.cache.get(appId) || null;
         }
 
+        // 2. Delega para a função de busca em lote para otimizar a requisição.
+        // Mesmo para um único ID, isso centraliza a lógica de chamada da API.
         try {
-            console.log(`[GameService] Buscando detalhes na API Steam para AppID: ${appId}...`);
-            const response = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appId}`);
+            const results = await this.getMultipleGameDetails([appId]);
+            return results.get(appId) || null;
+        } catch (error) {
+            // A função getMultipleGameDetails já loga o erro.
+            // Retornamos null para manter a assinatura do método.
+            return null;
+        }
+    }
+
+    /**
+     * Busca informações de vários jogos de uma vez, otimizando as requisições para evitar rate limits.
+     * @param appIds Uma lista de IDs de jogos.
+     * @returns Um Map onde a chave é o AppID e o valor é a informação do jogo.
+     */
+    public async getMultipleGameDetails(appIds: number[]): Promise<Map<number, GameInfo>> {
+        const results = new Map<number, GameInfo>();
+        const idsToFetch: number[] = [];
+
+        // Separa os que já estão no cache dos que precisam ser buscados
+        for (const appId of appIds) {
+            if (this.cache.has(appId)) {
+                results.set(appId, this.cache.get(appId)!);
+            } else {
+                idsToFetch.push(appId);
+            }
+        }
+
+        if (idsToFetch.length === 0) {
+            console.log(`[GameService] Detalhes de todos os jogos solicitados já estavam em cache.`);
+            return results;
+        }
+
+        try {
+            const appIdsString = idsToFetch.join(',');
+            console.log(`[GameService] Buscando detalhes na API Steam para ${idsToFetch.length} AppIDs: ${appIdsString}...`);
+            const response = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appIdsString}`);
+
+            if (response.status === 429) {
+                // Lança um erro específico para que o chamador possa tratar o rate limit.
+                throw new Error(`Muitas requisições (429). A API da Steam limitou o acesso. Tente novamente mais tarde ou com menos jogos.`);
+            }
             if (!response.ok) {
                 throw new Error(`Falha na requisição: ${response.status} ${response.statusText}`);
             }
             const data: any = await response.json();
-            console.log(`[GameService] Resposta recebida para ${appId}. Status: ${response.status}`);
+            console.log(`[GameService] Resposta em lote recebida. Status: ${response.status}`);
 
-            // A estrutura da resposta da Steam é: { "730": { success: true, data: { ... } } }
-            if (data[appId] && data[appId].success) {
-                const gameData = data[appId].data;
-                
-                const info: GameInfo = {
-                    id: appId,
-                    name: gameData.name,
-                    imageUrl: gameData.header_image // URL da imagem de capa (banner)
-                };
+            // Processa a resposta para cada ID que buscamos
+            for (const appId of idsToFetch) {
+                const appIdStr = appId.toString();
+                if (data[appIdStr] && data[appIdStr].success) {
+                    const gameData = data[appIdStr].data;
+                    
+                    const info: GameInfo = {
+                        id: appId,
+                        name: gameData.name,
+                        imageUrl: gameData.header_image // URL da imagem de capa (banner)
+                    };
 
-                // Salva no cache
-                this.cache.set(appId, info);
-                return info;
-            } else {
-                console.warn(`Jogo ${appId} não encontrado ou loja indisponível.`);
-                return null;
+                    // Salva no cache e no resultado
+                    this.cache.set(appId, info);
+                    results.set(appId, info);
+                } else {
+                    console.warn(`[GameService] Jogo ${appId} não encontrado ou falhou na resposta em lote.`);
+                }
             }
         } catch (error) {
-            console.error(`Erro ao buscar dados do jogo ${appId}:`, error);
-            return null;
+            console.error(`[GameService] Erro ao buscar dados de múltiplos jogos:`, error);
+            // Re-lança o erro para que o chamador (ex: Idler) saiba que a operação falhou.
+            throw error;
         }
+        return results;
     }
 
     /**

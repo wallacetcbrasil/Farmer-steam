@@ -1,5 +1,11 @@
+# Arquivos de dependências
 node_modules/
-dist/
+
+# Arquivos de ambiente - Contêm segredos!
 .env
-.DS_Store
-Thumbs.db
+
+# Logs
+*.log
+
+# Arquivo de memória da IA
+Agents_IA.md

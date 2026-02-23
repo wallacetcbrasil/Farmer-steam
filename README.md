@@ -6,11 +6,10 @@ Uma ferramenta visual e robusta para farmar horas de jogo e cartas na Steam. Des
 
 ## 🚀 Funcionalidades
 
-- **Modo Cliente (Steam Aberta):** Farma jogos utilizando a instalação local da Steam. Permite jogar outros títulos simultaneamente sem conflitos (o farm roda em background).
-- **Modo Credenciais (Headless):** Farma em servidores ou PC sem Steam instalada (requer login/senha).
-- **Modo QR Code:** Login seguro via aplicativo móvel da Steam, sem necessidade de digitar a senha.
+- **Modo Cliente:** Farma horas de jogo utilizando a sua instalação local da Steam, que precisa estar aberta e logada.
 - **Interface Web:** Controle visual amigável para buscar jogos, ver capas e gerenciar o farm.
-- **Reconexão Inteligente:** Detecta se você abriu um jogo e pausa o farm automaticamente para evitar desconexões.
+- **Exportação de Lista:** Permite baixar uma lista de jogos selecionados para reutilização futura.
+- **Farm por Arquivo:** Inicia o farm a partir de um arquivo `.txt` contendo uma lista de IDs de jogos.
 
 ## 📦 Instalação
 
@@ -26,10 +25,6 @@ Uma ferramenta visual e robusta para farmar horas de jogo e cartas na Steam. Des
    ```bash
    npm install
    ```
-
-3. (Opcional) Configure as variáveis de ambiente:
-   - Renomeie o arquivo `.env.example` para `.env`.
-   - Preencha com seu usuário e senha se quiser usar o login automático.
 
 ## 🎮 Como Usar
 

@@ -2,131 +2,643 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Steam Farmer Visual</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steam Farmer 🚜</title>
     <style>
-        body { font-family: sans-serif; background: #1b2838; color: #c7d5e0; padding: 20px; }
-        .container { max-width: 800px; margin: 0 auto; }
-        .card { background: #171a21; padding: 20px; border-radius: 5px; margin-bottom: 20px; }
-        input, button, select { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
-        button { background: #66c0f4; color: white; border: none; cursor: pointer; font-weight: bold; }
-        button:hover { background: #419dc9; }
-        .game-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 10px; }
-        .game-item { background: #2a475e; padding: 10px; text-align: center; cursor: pointer; border: 2px solid transparent; }
-        .game-item:hover { border-color: #66c0f4; }
-        .game-item.selected { border-color: #a4d007; background: #3c502a; }
-        .game-item img { max-width: 100%; }
-        h2 { border-bottom: 1px solid #2a475e; padding-bottom: 10px; }
+        :root {
+            --bg-color: #1b2838;
+            --bg-light: #2a475e;
+            --bg-dark: #171a21;
+            --text-color: #c7d5e0;
+            --accent-color: #66c0f4;
+            --accent-hover: #4a95c2;
+            --red: #d2361e;
+            --green: #8bc53f;
+            --orange: #f39c12;
+        }
+        body {
+            font-family: 'Motiva Sans', Arial, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            font-size: 14px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: var(--bg-color);
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            overflow: hidden;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 25px;
+            background-color: rgba(0,0,0,0.2);
+        }
+        header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: #fff;
+        }
+        main {
+            padding: 25px;
+        }
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--bg-light);
+            margin-bottom: 20px;
+        }
+        .tab-link {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: var(--text-color);
+            font-size: 16px;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s ease-in-out;
+        }
+        .tab-link:hover {
+            background-color: var(--bg-light);
+        }
+        .tab-link.active {
+            color: var(--accent-color);
+            border-bottom-color: var(--accent-color);
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="number"], input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            background-color: var(--bg-dark);
+            border: 1px solid var(--bg-light);
+            border-radius: 4px;
+            color: var(--text-color);
+            box-sizing: border-box;
+        }
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+        .btn {
+            background-color: var(--accent-color);
+            color: #fff;
+        }
+        .btn:hover {
+            background-color: var(--accent-hover);
+        }
+        .btn-start {
+            background-color: var(--green);
+            color: #fff;
+        }
+        .btn-start:hover {
+            background-color: #6a9c32;
+        }
+        .stop-button {
+            background-color: var(--red);
+            color: #fff;
+        }
+        .stop-button:hover {
+            background-color: #a02916;
+        }
+        .search-results, .selected-list, .achievements-list {
+            max-height: 200px;
+            overflow-y: auto;
+            background-color: var(--bg-dark);
+            border: 1px solid var(--bg-light);
+            border-radius: 4px;
+            list-style: none;
+            padding: 0;
+            margin-top: 10px;
+        }
+        .list-item {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            border-bottom: 1px solid var(--bg-light);
+            cursor: pointer;
+        }
+        .list-item:last-child { border-bottom: none; }
+        .list-item:hover { background-color: var(--bg-light); }
+        .list-item img {
+            width: 92px; /* 184px / 2 */
+            height: 34.5px; /* 69px / 2 */
+            margin-right: 10px;
+            border-radius: 2px;
+        }
+        .list-item .info {
+            flex-grow: 1;
+        }
+        .list-item .info span {
+            font-size: 12px;
+            opacity: 0.7;
+        }
+        .list-item .remove-btn {
+            background: none;
+            border: none;
+            color: var(--red);
+            font-size: 18px;
+            cursor: pointer;
+            padding: 5px;
+        }
+        .achievements-list .list-item {
+            cursor: grab;
+        }
+        .achievements-list .list-item:grabbing {
+            cursor: grabbing;
+        }
+        .achievements-list .list-item img {
+            width: 32px;
+            height: 32px;
+        }
+        .achievements-list .list-item input[type="checkbox"] {
+            margin-right: 10px;
+        }
+        .file-upload-label {
+            display: inline-block;
+            padding: 10px 15px;
+            background-color: var(--accent-color);
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .file-upload-label:hover {
+            background-color: var(--accent-hover);
+        }
+        input[type="file"] {
+            display: none;
+        }
+        .split-group {
+            display: flex;
+            gap: 15px;
+        }
+        .split-group .form-group {
+            flex: 1;
+        }
+        footer {
+            background-color: var(--bg-dark);
+            padding: 20px 25px;
+        }
+        footer h2 {
+            margin: 0 0 10px 0;
+            font-size: 18px;
+            color: #fff;
+        }
+        #log-container {
+            height: 200px;
+            background-color: #000;
+            border-radius: 4px;
+            padding: 10px;
+            overflow-y: auto;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .log-info { color: #fff; }
+        .log-error { color: var(--red); }
+        .log-warning { color: var(--orange); }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Steam Farmer 🚜</h1>
+        <header>
+            <h1>Steam Farmer 🚜</h1>
+            <button id="stop-button" class="stop-button">Parar Farm</button>
+        </header>
 
-        <!-- Busca de Jogos -->
-        <div class="card">
-            <h2>1. Selecionar Jogos</h2>
-            <input type="text" id="searchInput" placeholder="Digite o nome do jogo (ex: Counter Strike)...">
-            <button onclick="searchGames()">Pesquisar</button>
-            <div id="results" class="game-grid"></div>
-            <p>IDs Selecionados: <span id="selectedIds">Nenhum</span></p>
-        </div>
+        <main>
+            <nav class="tabs">
+                <button class="tab-link active" data-tab="tab-hours">Farm de Horas</button>
+                <button class="tab-link" data-tab="tab-achievements">Farm de Conquistas</button>
+                <button class="tab-link" data-tab="tab-cards">Farm de Cartas</button>
+                <button class="tab-link" data-tab="tab-settings">Configurações</button>
+            </nav>
 
-        <!-- Configuração -->
-        <div class="card">
-            <h2>2. Configuração</h2>
-            <label>Duração (minutos):</label>
-            <input type="number" id="duration" value="60">
-            
-            <label>Modo de Operação:</label>
-            <select id="mode" onchange="toggleCredentials()">
-                <option value="client">Modo Cliente (Steam Aberta)</option>
-                <option value="credentials">Modo Login (Servidor/Headless)</option>
-            </select>
+            <!-- ==================== TAB 1: FARM DE HORAS ==================== -->
+            <div id="tab-hours" class="tab-content active">
+                <div class="form-group">
+                    <label for="game-search-hours">1. Selecionar Jogos</label>
+                    <input type="text" id="game-search-hours" placeholder="Digite o nome de um jogo para buscar...">
+                    <ul id="search-results-hours" class="search-results"></ul>
+                </div>
 
-            <div id="credFields" style="display:none; margin-top:10px; border-top: 1px solid #333; padding-top:10px;">
-                <input type="text" id="username" placeholder="Usuário Steam">
-                <input type="password" id="password" placeholder="Senha Steam">
-                <small style="color: orange;">⚠ Se pedir Steam Guard, olhe o terminal onde iniciou o script.</small>
+                <div class="form-group">
+                    <label>2. Farmar a partir de Arquivo (.txt)</label>
+                    <label for="file-upload" class="file-upload-label">Carregar Arquivo</label>
+                    <input type="file" id="file-upload" accept=".txt">
+                    <span id="file-name"></span>
+                </div>
+
+                <div class="form-group">
+                    <label>Jogos Selecionados para Farmar</label>
+                    <ul id="selected-games-list" class="selected-list">
+                        <!-- Jogos selecionados aparecerão aqui -->
+                    </ul>
+                </div>
+
+                <div class="form-group">
+                    <label for="duration-input">Duração do Farm (em minutos)</label>
+                    <input type="number" id="duration-input" value="60" min="1">
+                </div>
+
+                <button id="start-hours-button" class="btn-start">Iniciar Farm de Horas</button>
             </div>
-        </div>
 
-        <!-- Ações -->
-        <div class="card">
-            <button onclick="startFarm()" style="background: #a4d007; color: #1b2838;">INICIAR FARM</button>
-            <button onclick="stopFarm()" style="background: #c94141; margin-top: 10px;">PARAR TUDO</button>
-        </div>
+            <!-- ==================== TAB 2: FARM DE CONQUISTAS ==================== -->
+            <div id="tab-achievements" class="tab-content">
+                <div class="form-group">
+                    <label for="game-search-ach">1. Buscar Jogo</label>
+                    <input type="text" id="game-search-ach" placeholder="Digite o nome do jogo para farmar conquistas...">
+                    <ul id="search-results-ach" class="search-results"></ul>
+                </div>
+
+                <div id="selected-game-ach-container" style="display: none;">
+                    <div class="form-group">
+                        <label>2. Selecionar e Ordenar Conquistas (arraste para reordenar)</label>
+                        <ul id="achievements-list" class="achievements-list"></ul>
+                    </div>
+
+                    <div class="split-group">
+                        <div class="form-group">
+                            <label for="min-minutes">Desbloquear após (minutos)</label>
+                            <input type="number" id="min-minutes" value="1" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="max-minutes">Até (minutos)</label>
+                            <input type="number" id="max-minutes" value="60" min="1">
+                        </div>
+                    </div>
+                    <button id="start-ach-button" class="btn-start">Iniciar Farm de Conquistas</button>
+                </div>
+            </div>
+
+            <!-- ==================== TAB 3: FARM DE CARTAS ==================== -->
+            <div id="tab-cards" class="tab-content">
+                <h2>Farm de Cartas (Estilo Idle Master)</h2>
+                <p>Esta função irá buscar automaticamente todos os jogos na sua conta que ainda possuem drops de cartas e irá farmá-los um por um.</p>
+                <p>As informações necessárias (SteamID64 e cookies) devem ser preenchidas na aba <strong>Configurações</strong>.</p>
+                <button id="start-cards-button" class="btn-start">Iniciar Farm de Cartas</button>
+            </div>
+
+            <!-- ==================== TAB 4: CONFIGURAÇÕES ==================== -->
+            <div id="tab-settings" class="tab-content">
+                <h2>Configurações Gerais</h2>
+                <p>Suas configurações são salvas automaticamente no seu navegador. Elas nunca saem do seu computador.</p>
+                <div class="form-group">
+                    <label for="steam-api-key">Chave da API Steam (Necessária para Farm de Conquistas)</label>
+                    <input type="password" id="steam-api-key" placeholder="Cole sua chave de API aqui">
+                </div>
+                <div class="form-group">
+                    <label for="steamid64">SteamID64 (Necessário para Farm de Cartas)</label>
+                    <input type="text" id="steamid64" placeholder="Ex: 76561198000000000">
+                </div>
+                <div class="form-group">
+                    <label for="sessionid">Cookie 'sessionid'</label>
+                    <input type="text" id="sessionid" placeholder="Cole o valor do cookie aqui">
+                </div>
+                <div class="form-group">
+                    <label for="steamLoginSecure">Cookie 'steamLoginSecure'</label>
+                    <input type="text" id="steamLoginSecure" placeholder="Cole o valor do cookie aqui">
+                </div>
+                <button id="clear-settings-button" class="stop-button">Limpar Configurações Salvas</button>
+            </div>
+        </main>
+
+        <footer>
+            <h2>Log de Atividades</h2>
+            <div id="log-container"></div>
+        </footer>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script>
-        let selectedGames = new Set();
-
-        async function searchGames() {
-            const query = document.getElementById('searchInput').value;
-            const res = await fetch(`/api/search?q=${query}`);
-            const games = await res.json();
+        document.addEventListener('DOMContentLoaded', () => {
+            // Elementos da UI
+            const logContainer = document.getElementById('log-container');
+            const stopButton = document.getElementById('stop-button');
             
-            const grid = document.getElementById('results');
-            grid.innerHTML = '';
-            
-            games.forEach(game => {
-                const div = document.createElement('div');
-                div.className = 'game-item';
-                div.onclick = () => toggleGame(game.id, div);
-                div.innerHTML = `
-                    <img src="${game.imageUrl}" alt="${game.name}">
-                    <div style="font-size: 12px; margin-top: 5px;">${game.name}</div>
-                    <div style="font-size: 10px; color: #888;">ID: ${game.id}</div>
-                `;
-                grid.appendChild(div);
+            // --- Lógica de Abas ---
+            const tabLinks = document.querySelectorAll('.tab-link');
+            const tabContents = document.querySelectorAll('.tab-content');
+            tabLinks.forEach(link => {
+                link.addEventListener('click', () => {
+                    const tabId = link.getAttribute('data-tab');
+                    
+                    tabLinks.forEach(l => l.classList.remove('active'));
+                    tabContents.forEach(c => c.classList.remove('active'));
+                    
+                    link.classList.add('active');
+                    document.getElementById(tabId).classList.add('active');
+                });
             });
-        }
 
-        function toggleGame(id, element) {
-            if (selectedGames.has(id)) {
-                selectedGames.delete(id);
-                element.classList.remove('selected');
-            } else {
-                selectedGames.add(id);
-                element.classList.add('selected');
-            }
-            document.getElementById('selectedIds').innerText = Array.from(selectedGames).join(', ');
-        }
+            // --- Lógica Geral ---
+            const log = (message, type = 'info') => {
+                const p = document.createElement('p');
+                p.textContent = message;
+                p.className = `log-${type}`;
+                logContainer.appendChild(p);
+                logContainer.scrollTop = logContainer.scrollHeight;
+            };
 
-        function toggleCredentials() {
-            const mode = document.getElementById('mode').value;
-            document.getElementById('credFields').style.display = mode === 'credentials' ? 'block' : 'none';
-        }
+            const fetchAPI = async (url, options = {}) => {
+                try {
+                    const response = await fetch(url, options);
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.message || `Erro ${response.status}`);
+                    }
+                    return response.json();
+                } catch (error) {
+                    log(`Erro de API: ${error.message}`, 'error');
+                    throw error;
+                }
+            };
 
-        async function startFarm() {
-            const mode = document.getElementById('mode').value;
-            const duration = parseInt(document.getElementById('duration').value);
-            const appIds = Array.from(selectedGames);
+            // Conexão com Server-Sent Events para logs em tempo real
+            const eventSource = new EventSource('/api/events');
+            eventSource.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                log(data.message, data.type);
+            };
+            eventSource.onerror = () => {
+                log('Conexão com o servidor perdida. Tentando reconectar...', 'error');
+            };
 
-            if (appIds.length === 0) return alert('Selecione pelo menos um jogo!');
-
-            let endpoint = '/api/start-client';
-            let body = { appIds, duration };
-
-            if (mode === 'credentials') {
-                endpoint = '/api/start-credentials';
-                body.username = document.getElementById('username').value;
-                body.password = document.getElementById('password').value;
-                if (!body.username || !body.password) return alert('Preencha usuário e senha!');
-            }
-
-            const res = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
+            stopButton.addEventListener('click', () => {
+                fetchAPI('/api/stop', { method: 'POST' });
             });
-            const data = await res.json();
-            alert(data.message);
-        }
 
-        async function stopFarm() {
-            await fetch('/api/stop', { method: 'POST' });
-            alert('Comando de parada enviado.');
-        }
+            // --- Lógica da Aba 1: Farm de Horas ---
+            const gameSearchHoursInput = document.getElementById('game-search-hours');
+            const searchResultsHours = document.getElementById('search-results-hours');
+            const selectedGamesList = document.getElementById('selected-games-list');
+            const durationInput = document.getElementById('duration-input');
+            const startHoursButton = document.getElementById('start-hours-button');
+            const fileUpload = document.getElementById('file-upload');
+            const fileNameSpan = document.getElementById('file-name');
+            let selectedGames = new Map();
+
+            const renderSelectedGames = () => {
+                selectedGamesList.innerHTML = '';
+                if (selectedGames.size === 0) {
+                    selectedGamesList.innerHTML = '<li class="list-item">Nenhum jogo selecionado.</li>';
+                    return;
+                }
+                selectedGames.forEach(game => {
+                    const li = document.createElement('li');
+                    li.className = 'list-item';
+                    li.innerHTML = `
+                        <img src="${game.imageUrl}" alt="${game.name}">
+                        <div class="info">
+                            ${game.name}<br>
+                            <span>AppID: ${game.id}</span>
+                        </div>
+                        <button class="remove-btn" data-id="${game.id}">&times;</button>
+                    `;
+                    selectedGamesList.appendChild(li);
+                });
+            };
+
+            const addGame = (game) => {
+                if (!selectedGames.has(game.id)) {
+                    selectedGames.set(game.id, game);
+                    renderSelectedGames();
+                }
+            };
+
+            gameSearchHoursInput.addEventListener('input', async (e) => {
+                const query = e.target.value;
+                if (query.length < 3) {
+                    searchResultsHours.innerHTML = '';
+                    return;
+                }
+                const games = await fetchAPI(`/api/search?q=${encodeURIComponent(query)}`);
+                searchResultsHours.innerHTML = '';
+                games.forEach(game => {
+                    const li = document.createElement('li');
+                    li.className = 'list-item';
+                    li.innerHTML = `<img src="${game.imageUrl}" alt="${game.name}"> ${game.name}`;
+                    li.addEventListener('click', () => {
+                        addGame(game);
+                        gameSearchHoursInput.value = '';
+                        searchResultsHours.innerHTML = '';
+                    });
+                    searchResultsHours.appendChild(li);
+                });
+            });
+
+            selectedGamesList.addEventListener('click', (e) => {
+                if (e.target.classList.contains('remove-btn')) {
+                    const gameId = parseInt(e.target.getAttribute('data-id'));
+                    selectedGames.delete(gameId);
+                    renderSelectedGames();
+                }
+            });
+
+            fileUpload.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                fileNameSpan.textContent = file.name;
+                const reader = new FileReader();
+                reader.onload = async (event) => {
+                    const text = event.target.result;
+                    const appIds = text.split(/\s+/).map(Number).filter(id => id > 0);
+                    log(`Carregados ${appIds.length} AppIDs do arquivo.`);
+                    // Aqui precisaríamos buscar os detalhes dos jogos, mas por simplicidade vamos adicionar com nome genérico
+                    appIds.forEach(id => addGame({ id, name: `Jogo (ID: ${id})`, imageUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${id}/header.jpg` }));
+                };
+                reader.readAsText(file);
+            });
+
+            startHoursButton.addEventListener('click', () => {
+                const appIds = Array.from(selectedGames.keys());
+                const duration = parseInt(durationInput.value);
+                if (appIds.length === 0) {
+                    log('Selecione pelo menos um jogo para farmar.', 'warning');
+                    return;
+                }
+                fetchAPI('/api/start-client', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ appIds, duration })
+                });
+            });
+
+            renderSelectedGames();
+
+            // --- Lógica da Aba 2: Farm de Conquistas ---
+            const gameSearchAchInput = document.getElementById('game-search-ach');
+            const searchResultsAch = document.getElementById('search-results-ach');
+            const selectedGameContainer = document.getElementById('selected-game-ach-container');
+            const achievementsList = document.getElementById('achievements-list');
+            const startAchButton = document.getElementById('start-ach-button');
+            const minMinutesInput = document.getElementById('min-minutes');
+            const maxMinutesInput = document.getElementById('max-minutes');
+            let selectedGameForAch = null;
+            let sortable = null;
+
+            gameSearchAchInput.addEventListener('input', async (e) => {
+                const query = e.target.value;
+                if (query.length < 3) {
+                    searchResultsAch.innerHTML = '';
+                    return;
+                }
+                const games = await fetchAPI(`/api/search?q=${encodeURIComponent(query)}`);
+                searchResultsAch.innerHTML = '';
+                games.forEach(game => {
+                    const li = document.createElement('li');
+                    li.className = 'list-item';
+                    li.innerHTML = `<img src="${game.imageUrl}" alt="${game.name}"> ${game.name}`;
+                    li.addEventListener('click', async () => {
+                        selectedGameForAch = game;
+                        gameSearchAchInput.value = game.name;
+                        searchResultsAch.innerHTML = '';
+                        selectedGameContainer.style.display = 'block';
+                        achievementsList.innerHTML = '<li class="list-item">Carregando conquistas...</li>';
+                        try {
+                            const apiKey = document.getElementById('steam-api-key').value;
+                            if (!apiKey) {
+                                throw new Error('Por favor, insira sua Chave da API Steam na aba "Configurações" para usar esta função.');
+                            }
+                            const result = await fetchAPI(`/api/achievements/${game.id}`, { headers: { 'X-Steam-API-Key': apiKey } });
+
+                            achievementsList.innerHTML = '';
+                            result.data.forEach(ach => {
+                                const li = document.createElement('li');
+                                li.className = 'list-item';
+                                li.dataset.apiName = ach.apiName;
+                                li.innerHTML = `
+                                    <input type="checkbox" checked>
+                                    <img src="${ach.icon}" alt="${ach.displayName}">
+                                    <div class="info">
+                                        ${ach.displayName}<br>
+                                        <span>${ach.description || 'Sem descrição.'}</span>
+                                    </div>
+                                `;
+                                achievementsList.appendChild(li);
+                            });
+                            if (sortable) sortable.destroy();
+                            sortable = Sortable.create(achievementsList, { animation: 150 });
+                        } catch (error) {
+                            achievementsList.innerHTML = `<li class="list-item">${error.message}</li>`;
+                        }
+                    });
+                    searchResultsAch.appendChild(li);
+                });
+            });
+
+            startAchButton.addEventListener('click', () => {
+                if (!selectedGameForAch) return;
+                const achievementItems = achievementsList.querySelectorAll('li');
+                const achievementsToUnlock = [];
+                achievementItems.forEach(item => {
+                    const checkbox = item.querySelector('input[type="checkbox"]');
+                    if (checkbox && checkbox.checked) {
+                        achievementsToUnlock.push(item.dataset.apiName);
+                    }
+                });
+
+                if (achievementsToUnlock.length === 0) {
+                    log('Selecione pelo menos uma conquista.', 'warning');
+                    return;
+                }
+
+                fetchAPI('/api/start-achievement-farm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        appId: selectedGameForAch.id,
+                        achievements: achievementsToUnlock,
+                        minMinutes: parseInt(minMinutesInput.value),
+                        maxMinutes: parseInt(maxMinutesInput.value)
+                    })
+                });
+            });
+
+            // --- Lógica da Aba 3: Farm de Cartas ---
+            const startCardsButton = document.getElementById('start-cards-button');
+
+            startCardsButton.addEventListener('click', () => {
+                const steamId64 = document.getElementById('steamid64').value.trim();
+                const sessionid = document.getElementById('sessionid').value.trim();
+                const steamLoginSecure = document.getElementById('steamLoginSecure').value.trim();
+
+                if (!steamId64 || !sessionid || !steamLoginSecure) {
+                    log('SteamID64 e os cookies são obrigatórios. Configure-os na aba "Configurações".', 'warning');
+                    return;
+                }
+
+                fetchAPI('/api/start-card-farm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ steamId64, sessionid, steamLoginSecure })
+                });
+            });
+
+            // --- Lógica da Aba 4: Configurações ---
+            const settingsInputs = {
+                apiKey: document.getElementById('steam-api-key'),
+                steamId: document.getElementById('steamid64'),
+                sessionId: document.getElementById('sessionid'),
+                steamLoginSecure: document.getElementById('steamLoginSecure'),
+            };
+            const clearSettingsButton = document.getElementById('clear-settings-button');
+            const CONFIG_KEY = 'steamFarmerConfig';
+
+            const saveSettings = () => {
+                const config = {
+                    apiKey: settingsInputs.apiKey.value,
+                    steamId: settingsInputs.steamId.value,
+                    sessionId: settingsInputs.sessionId.value,
+                    steamLoginSecure: settingsInputs.steamLoginSecure.value,
+                };
+                localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+            };
+
+            const loadSettings = () => {
+                const savedConfig = localStorage.getItem(CONFIG_KEY);
+                if (savedConfig) {
+                    const config = JSON.parse(savedConfig);
+                    settingsInputs.apiKey.value = config.apiKey || '';
+                    settingsInputs.steamId.value = config.steamId || '';
+                    settingsInputs.sessionId.value = config.sessionId || '';
+                    settingsInputs.steamLoginSecure.value = config.steamLoginSecure || '';
+                    log('Configurações carregadas do navegador.', 'info');
+                }
+            };
+
+            const clearSettings = () => {
+                localStorage.removeItem(CONFIG_KEY);
+                Object.values(settingsInputs).forEach(input => input.value = '');
+                log('Configurações salvas foram limpas.', 'warning');
+            };
+
+            Object.values(settingsInputs).forEach(input => input.addEventListener('input', saveSettings));
+            clearSettingsButton.addEventListener('click', clearSettings);
+            loadSettings();
+        });
     </script>
 </body>
 </html>
